@@ -1,0 +1,51 @@
+version: '3.9'
+services:
+  postgres:
+    image: postgres:latest
+    container_name: postgres
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - .env
+    networks:
+      - default
+
+  flyway:
+    image: flyway/flyway
+    command: -url=jdbc:postgresql://${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB} -user=${POSTGRES_USER} -password=${POSTGRES_PASSWORD} -locations=filesystem:/flyway/sql migrate
+    volumes:
+      - ./flyway/sql:/flyway/sql
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    networks:
+      - default
+
+  hiclass:
+    image: alesban/hiclass-api
+    container_name: hiclass-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "7280:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    volumes:
+      - ./DefaultData:/app/DefaultData
+      - ./Configurations:/app/Configurations
+    networks:
+      - default
+
+networks:
+  default:
+    driver: bridge
